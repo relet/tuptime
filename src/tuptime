@@ -354,6 +354,8 @@ def print_since(db_rows, seconds, human):
     offset = max(0, seconds - first)  # if it is after seconds, ignore
     upsum  = sum([int(row['uptime']) for row in db_rows]) - offset
 
+    if upsum < 0:
+        upsum = 0
     if human:
         print time_conv(upsum)
     else:
@@ -592,7 +594,7 @@ def main():
         where = ""
         if arg.since is not None:
             isec = int(arg.since)
-            where = " where endst > %i or endst == 0" % isec
+            where = " where btime + uptime > %i" % isec
         # - Get all rows for calculate print values
         conn.execute('select rowid as startup, * from tuptime'+where)
         db_rows = conn.fetchall()
@@ -600,11 +602,13 @@ def main():
         # If the user can only read db, the previous select return outdated numbers in last row
         # because the db was not updated previously. The following snippet update that in memmory
         db_rows = [dict(row) for row in db_rows]  # for allow item assignment
+        if len(db_rows) == 0: 
+            db_rows = [{'btime':btime}]
         db_rows[-1]['uptime'] = uptime
         db_rows[-1]['endst'] = arg.endst
         db_rows[-1]['kernel'] = kernel
         startups = len(db_rows)  # Real startups
-        startups_num = db_rows[-1]['startup']  # Startups by rowid number
+        startups_num = db_rows[-1].get('startup',0)  # Startups by rowid number
 
         if startups != startups_num:
             logging.info('Real startups are not equal to enumerate startups '
